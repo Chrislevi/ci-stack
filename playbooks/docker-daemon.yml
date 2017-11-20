@@ -1,0 +1,14 @@
+---
+# Archive containers on infra
+
+- hosts: deploy-servers
+  tasks:
+    - name: "Network vars"
+      set_fact:
+        nexus_hostname: "{{ hostvars[groups['nexus-server'][0]]['ansible_host'] }}"
+        cj_jenkins_hostname: "{{ hostvars[groups['jenkins-server'][0]]['ansible_host'] }}"
+        gitlab_hostname: "{{ hostvars[groups['gitlab-server'][0]]['ansible_host'] }}"
+
+- hosts: deploy-servers
+  roles:
+  - simple-docker-daemon

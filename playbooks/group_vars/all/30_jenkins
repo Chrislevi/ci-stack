@@ -1,0 +1,86 @@
+---
+# Listen port
+cj_http_port: 8008
+
+# Nexus config
+cj_nexus_mirror: 'repository/jenkins-mirror'
+cj_nexus_updates: 'repository/jenkins-updates'
+cj_nexus_raw_all: 'repository/raw-all'
+
+cj_version: '2.75'
+cj_package: "jenkins_{{ cj_version }}_all.deb"
+cj_application_context: ''
+
+# Directories used by Jenkins
+cj_download_dir: "{{ reqs_dir }}"
+cj_home: "/var/lib/jenkins"
+cj_log_dir: "/var/log/jenkins"
+cj_cache_dir: "/var/cache/jenkins"
+cj_init_dir: "{{ cj_home }}/init.groovy.d"
+cj_update_dir: "{{ cj_home }}/updates"
+cj_webroot: "/var/cache/jenkins/war"
+cj_plugins_folder: "/opt/jenkins-plugins"
+cj_usercont_dir: "{{ cj_home }}/userContent"
+cj_uc_json: "/tmp/default.json"
+
+
+# jenkins 2 requires skip wizrd param
+# chenge this to true if you really want it ;)
+cj_run_startup_wizard: "false" # String becuase the jvm arg becomes False ...
+
+cj_jvm_args: "-Dhudson.model.DownloadService.noSignatureCheck=true -Dpermissive-script-security.enabled=true -Djava.awt.headless=true -Djenkins.install.runSetupWizard={{ cj_run_startup_wizard }}"
+cj_cmd_args: "--webroot={{ cj_webroot }} --httpPort={{ cj_http_port }}"
+
+# The system level user Jenkins should runas
+#TODO we should revmove this all together ...
+cj_runas: false
+cj_runas_user: "{{ cj_custom_user | d('jenkins') }}"
+cj_runas_group: "{{ cj_custom_group | d('jenkins') }}"
+
+# Authorization strategy basic
+cj_allow_anon_read: true
+cj_local_admin_users:
+  - { username: "{{ jenkins_admin.username }}", password: "{{ jenkins_admin.password }}" }
+
+cj_local_regular_users:
+  - { username: user1, password: user1 }
+  - { username: user2, password: user2 }
+
+#jenkins-cli
+cj_cli_jar_location: "{{ cj_cache_dir }}/war/WEB-INF/jenkins-cli.jar"
+
+# jenkins material theme
+# could be: red, pink, purple, deep-purple see full list @ -> http://afonsof.com/jenkins-material-theme/
+cj_theme_color: amber
+cj_theme_conf_file: org.codefirst.SimpleThemeDecorator.xml
+cj_theme_css_url: https://jenkins-contrib-themes.github.io/jenkins-material-theme/dist/material-{{ cj_theme_color }}.css
+cj_theme_js_url: https://cdn.rawgit.com/djonsson/jenkins-atlassian-theme/gh-pages/theme.js
+
+# Get list + versions from existing Jenkins as a base configuration ...
+#
+#java -jar /var/cache/jenkins/war/WEB-INF/jenkins-cli.jar -s http://localhost:8008 list-plugins \
+#| awk '{print $1, $NF;}' \
+#| awk -F " " ' {print " - { name: \""$1 "\","" version: \""  $2 "\", enabled: \"true\" }"} '
+
+# choose plugin sets to use
+cj_wizard: true
+cj_theme: true
+
+# Deploy pipelines
+cj_deploy_pipe: true
+
+# SSH Key Credentials
+cj_sshkey_credentials:
+  - {name: "Jenkins", id: "local-ssh-user", username: "{{ local_ssh.username }}", password: "{{ local_ssh.password }}", description: "Root SSH key credentials", private_key: "{{ cj_home }}/.ssh/id_rsa"}
+
+# User-Password Credentials
+cj_credentials:
+  - { name: "Github API user", id: "Github-user", username: "{{ github_user.username }}", password: "{{ github_user.password }}", description: "Github Creds"}
+  - { name: "Gitlab API user", id: "Gitlab-user", username: "{{ gitlab_user.username }}", password: "{{ gitlab_user.password }}", description: "Gitlab creds"}
+
+# Create slave nodes
+cj_nodes_create: true
+cj_nodes:
+  - { name: "localroot", host: "localhost", launcher_type: "ssh", ssh_port: "22", credential_id: "local-ssh-user", home: "/home/jenkins", labels: "localroot", executors: "1", description: "localroot" }
+
+cj_conf_file: /etc/default/jenkins

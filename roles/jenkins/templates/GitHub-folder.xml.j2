@@ -1,0 +1,68 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<jenkins.branch.OrganizationFolder plugin="branch-api@2.0.10">
+  <actions/>
+  <description></description>
+  <properties>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.config.FolderConfig plugin="pipeline-model-definition@1.1.5">
+      <dockerLabel></dockerLabel>
+      <registry plugin="docker-commons@1.6"/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.config.FolderConfig>
+    <jenkins.branch.NoTriggerOrganizationFolderProperty>
+      <branches>.*</branches>
+    </jenkins.branch.NoTriggerOrganizationFolderProperty>
+  </properties>
+  <folderViews class="jenkins.branch.OrganizationFolderViewHolder">
+    <owner reference="../.."/>
+  </folderViews>
+  <healthMetrics>
+    <com.cloudbees.hudson.plugins.folder.health.WorstChildHealthMetric plugin="cloudbees-folder@6.0.4">
+      <nonRecursive>false</nonRecursive>
+    </com.cloudbees.hudson.plugins.folder.health.WorstChildHealthMetric>
+  </healthMetrics>
+  <icon class="jenkins.branch.MetadataActionFolderIcon">
+    <owner class="jenkins.branch.OrganizationFolder" reference="../.."/>
+  </icon>
+  <orphanedItemStrategy class="com.cloudbees.hudson.plugins.folder.computed.DefaultOrphanedItemStrategy" plugin="cloudbees-folder@6.0.4">
+    <pruneDeadBranches>true</pruneDeadBranches>
+    <daysToKeep>0</daysToKeep>
+    <numToKeep>0</numToKeep>
+  </orphanedItemStrategy>
+  <triggers>
+    <com.cloudbees.hudson.plugins.folder.computed.PeriodicFolderTrigger plugin="cloudbees-folder@6.0.4">
+      <spec>* * * * *</spec>
+      <interval>60000</interval>
+    </com.cloudbees.hudson.plugins.folder.computed.PeriodicFolderTrigger>
+  </triggers>
+  <navigators>
+    <jenkins.scm.impl.SingleSCMNavigator plugin="scm-api@2.1.1">
+      <name>core</name>
+      <sources>
+        <org.jenkinsci.plugins.github__branch__source.GitHubSCMSource plugin="github-branch-source@2.0.6">
+          <id>b727aa2d-895b-4fd4-b37e-f73f3ec3f80b</id>
+          <checkoutCredentialsId>Github-user</checkoutCredentialsId>
+          <scanCredentialsId>Github-user</scanCredentialsId>
+          <repoOwner>{{ ostack_repo.split('/')[0] }}</repoOwner>
+          <repository>core</repository>
+          <includes>*</includes>
+          <excludes></excludes>
+          <buildOriginBranch>false</buildOriginBranch>
+          <buildOriginBranchWithPR>true</buildOriginBranchWithPR>
+          <buildOriginPRMerge>false</buildOriginPRMerge>
+          <buildOriginPRHead>false</buildOriginPRHead>
+          <buildForkPRMerge>false</buildForkPRMerge>
+          <buildForkPRHead>false</buildForkPRHead>
+        </org.jenkinsci.plugins.github__branch__source.GitHubSCMSource>
+      </sources>
+    </jenkins.scm.impl.SingleSCMNavigator>
+  </navigators>
+  <projectFactories>
+    <org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProjectFactory plugin="workflow-multibranch@2.15">
+{% set mode = dev_mode | bool %}
+{% if mode | bool %}
+      <scriptPath>Jenkinsfile-dev</scriptPath>
+{% else %}
+      <scriptPath>Jenkinsfile-phy</scriptPath>
+{% endif %}
+    </org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProjectFactory>
+  </projectFactories>
+</jenkins.branch.OrganizationFolder>

@@ -1,0 +1,39 @@
+---
+- name: "Set .deb dynamic dir -> {{ inventory_hostname }}"
+  set_fact:
+    cj_download_dir: /tmp
+  when: "hostvars[inventory_hostname]['ansible_default_ipv4']['address'] != hostvars[inventory_hostname]['ansible_host']"
+
+- name: "Fetch jenkins .deb file"
+  synchronize:
+    src: "{{ reqs_dir }}/{{ cj_package }}"
+    dest: "{{ cj_download_dir }}/{{ cj_package }}"
+    mode: push
+  when: "hostvars[inventory_hostname]['ansible_default_ipv4']['address'] != hostvars[inventory_hostname]['ansible_host']"
+
+- name: "install deps"
+  apt:
+    name: "{{ item }}"
+    state: installed
+  with_items:
+    - python-httplib2
+    - acl
+    - vim
+    - curl
+    - unzip
+    - python-jenkins
+    - python-lxml
+
+- name: "Install our specific version of Jenkins"
+  apt:
+    deb: "{{ cj_download_dir }}/{{ cj_package }}"
+    state: installed
+
+- name: "Configure Jenkins via {{ cj_conf_file }}"
+  template:
+    src: "jenkins-config.j2"
+    dest: "{{ cj_conf_file }}"
+    mode: 0755
+  register: config_changed
+
+- include: cj-restart-jenkins.yml

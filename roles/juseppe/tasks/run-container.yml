@@ -1,0 +1,27 @@
+---
+
+- set_fact:
+    juseppe_container_image: "{{ juseppe_container_prefix }}"
+
+#- name: "Login to nexus"
+#  docker_login:
+#    registry: "{{ nexus_docker_url }}"
+#    username: "admin"
+#    password: "{{ nexus_admin_password }}"
+
+- name: "Run juseppe container"
+  docker_container:
+    name: "{{ juseppe_container_name }}"
+    image: "{{ juseppe_container_image }}:{{ juseppe_container_tag }}"
+    state: started
+    restart_policy: always
+    restart: yes
+    volumes:
+      - "{{ juseppe_plugin_cache_dir }}:/juseppe/plugins/"
+      - "{{ juseppe_cert_dir }}/uc.key:/juseppe/cert/uc.key"
+      - "{{ juseppe_cert_dir }}/uc.crt:/juseppe/cert/uc.crt"
+    ports:
+      - "{{ juseppe_host_port }}:{{ juseppe_container_port }}"
+    env:
+      JUSEPPE_UPDATE_CENTER_ID: default
+      JUSEPPE_BASE_URI: "http://{{ juseppe_docker_host_ip }}:{{ juseppe_host_port }}"

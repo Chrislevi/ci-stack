@@ -1,0 +1,66 @@
+- include: "cj-update_site.yml"
+  when: cj_juseppe | bool
+
+- include: "cj-plugin_sets.yml"
+
+- block:
+    - name: "get installed plugin list"
+      shell: >
+        java -jar {{ cj_cli_jar_location }} \
+        -s http://{{ cj_jenkins_hostname }}:{{ cj_http_port }}{{ cj_application_context | default('') }}/ \
+        list-plugins | awk '{print $1}'
+      register: plugins_installed
+      changed_when: false
+
+    # Option 1
+    - name: "Install Jenkins plugins"
+      command: >
+        java -jar {{ cj_cli_jar_location }} \
+        -s http://{{ cj_jenkins_hostname }}:{{ cj_http_port }}{{ cj_application_context | default('') }}/ \
+        install-plugin {{ item.name }}
+      register: ips
+      with_items:
+        - "{{ cj_plugins }}"
+      when: plugins_installed and plugins_installed.stdout.find('{{ item.name }}') == -1
+      until: ips.rc == 0
+      retries: 10
+      delay: 8
+
+    ## Option 2 oneLine Installation
+    #- name: "Install Jenkins plugins"
+    #  command: >
+    #    java -jar {{ cj_cli_jar_location }} \
+    #    -s http://{{ cj_jenkins_hostname }}:{{ cj_http_port }}{{ cj_application_context | default('') }}/ \
+    #    install-plugin {{ cj_plugins | map(attribute='name') | join(' ') }}
+    #  register: ips
+    #  until: ips.rc == 0
+    #  retries: 3
+    #  delay: 3
+  when: cj_juseppe
+
+- block:
+  - name: "Create Jenkins plugins cache folder"
+    file:
+      path: "{{ cj_plugins_folder }}"
+      owner: "{{ cj_runas_user }}"
+      group: "{{ cj_runas_group }}"
+      state: directory
+      mode: 0755
+
+  - name: "Download plugins to cache dir -> {{ cj_plugins_folder }}"
+    get_url:
+      url: "{{ plugin_url |d('http://mirrors.jenkins-ci.org') }}/plugins/{{ item.name }}/{{ item.version }}/{{ item.name }}.{{ item.extention | d('hpi') }}"
+      dest: "{{ cj_plugins_folder }}"
+    with_items:
+    - "{{ cj_plugins }}"
+    register: res
+    until: '"OK" in res.msg'
+    retries: 5
+    delay: 5
+
+  - name: "copy plugins to dir"
+    copy:
+      src: "{{ cj_plugins_folder }}/"
+      dest: "{{ cj_home }}/plugins/"
+
+  when: (not cj_juseppe | bool) and (cj_plugins_folder == "/opt/jenkins-plugins")

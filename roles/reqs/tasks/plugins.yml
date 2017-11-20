@@ -1,0 +1,17 @@
+- name: "Merge lists to form juseppe_plugins"
+  include: "set-plugin-list.yml"
+
+- name: "Create cache dir"
+  file:
+    name: "{{ juseppe_plugin_cache_dir }}"
+    state: directory
+    owner: root
+    group: root
+
+- name: "Download Plugins"
+  shell: "cd {{ juseppe_plugin_cache_dir }} ; wget -S --no-check-certificate \
+         --retry-connrefused --waitretry=1 --connect-timeout=5 --read-timeout=5 \
+         --dns-timeout=30 -t 5 -c --verbose \
+         {{ plugin_url |d('https://updates.jenkins-ci.org') }}/download/plugins/{{ item.name }}/{{ item.version }}/{{ item.name }}.{{ item.extention | d('hpi') }}"
+  with_items:
+  - "{{ juseppe_plugins }}"

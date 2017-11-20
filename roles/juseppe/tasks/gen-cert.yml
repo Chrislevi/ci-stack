@@ -1,0 +1,38 @@
+---
+- name: "install openssl"
+  package:
+    name: openssl
+    state: latest
+
+- name: "Create cache dir"
+  file:
+    name: "{{ juseppe_cert_dir }}"
+    state: directory
+    owner: root
+    group: root
+
+- name: "Check the private key exists"
+  stat: path="{{ juseppe_cert_dir }}/uc.key"
+  register: private_result
+
+- name: "Generate private key"
+  shell: >
+    openssl genrsa -out uc.key 2048
+  args:
+    chdir: "{{ juseppe_cert_dir }}"
+  when: not private_result.stat.exists
+
+- name: "Check the certificate exists"
+  stat: path="{{ juseppe_cert_dir }}/{{ juseppe_cert_file }}"
+  register: certificate_result
+
+- name: "Generate certificate based on private key"
+  shell: >
+    openssl req -nodes -x509 -new \
+    -key uc.key \
+    -out {{ juseppe_cert_file }} \
+    -days 1056 \
+    -subj "/C=/ST=Update-Center/L=Juseppe/O=Juseppe"EN
+  args:
+    chdir: "{{ juseppe_cert_dir }}"
+  when: (not certificate_result.stat.exists) or (not private_result.stat.exists)

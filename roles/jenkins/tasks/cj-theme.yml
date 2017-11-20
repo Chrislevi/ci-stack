@@ -1,0 +1,30 @@
+---
+- name: "Cache the themes css and js in Jenkins userContent"
+  copy:
+    src: "material-{{ cj_theme_color }}.css"
+    dest: "{{ cj_home }}/userContent/material-{{ cj_theme_color }}.css"
+    owner: "{{ cj_runas_user }}"
+    group: "{{ cj_runas_group }}"
+    mode: 0755
+
+- name: "Cache the themes css and js in Jenkins userContent"
+  copy:
+    src: "theme.js"
+    dest: "{{ cj_home }}/userContent/theme.js"
+    owner: "{{ cj_runas_user }}"
+    group: "{{ cj_runas_group }}"
+    mode: 0755
+
+- name: "update Jenkins theme setting"
+  template:
+    src: "{{ cj_theme_conf_file }}.j2"
+    dest: "{{ cj_home }}/{{ cj_theme_conf_file }}"
+    owner: "{{ cj_runas_user }}"
+    group: "{{ cj_runas_group }}"
+    mode: 0755
+  with_items:
+    - "{{ cj_plugins }}"
+  register: theme_config
+  when: (( item.name == "simple-theme-plugin" ) and ( item.enabled == "true" ))
+
+- include: cj-restart-jenkins.yml

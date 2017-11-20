@@ -1,0 +1,58 @@
+---
+- set_fact:
+    cj_update_center_url: "{{ juseppe_url }}"
+  when: cj_juseppe | bool
+
+- name: "Create Jenkins updates folder + plugins temporary download folder"
+  file:
+    path: "{{ item }}"
+    owner: "{{ cj_runas_user }}"
+    group: "{{ cj_runas_group }}"
+    state: directory
+    mode: 0755
+  with_items:
+    - "{{ cj_home }}/updates"
+
+- name: "Update Jenkins plugin update-center json"
+  get_url:
+    url: "{{ cj_update_center_url | d('http://mirrors.jenkins-ci.org/updates') }}/update-center.json"
+    dest: "{{ cj_uc_json }}"
+    owner: "{{ cj_runas_user }}"
+    group: "{{ cj_runas_group }}"
+    mode: 0755
+    validate_certs: false
+  register: update_site
+
+- name: "remove 'postback' unnecessary string"
+  shell: sed -i 's/{{ item }}//g' {{ cj_uc_json }}
+  with_items:
+  - 'updateCenter.post('
+  - ');'
+
+- name: "remove blank lines in default.json"
+  lineinfile:
+    dest: "{{ cj_uc_json }}"
+    regexp: '^(?:[\t ]*(?:\r?\n|\r))+'
+    state: absent
+    owner: "{{ cj_runas_user }}"
+    group: "{{ cj_runas_group }}"
+    mode: 0755
+  when: update_site.changed
+
+- name: "Inject update-center.json"
+  copy:
+    src: '{{ cj_uc_json }}'
+    dest: "{{ item }}"
+    remote_src: true
+  with_items:
+  - "{{ cj_home }}/updates/{{ cj_uc_json.split('/')[2] }}"
+  - "{{ cj_usercont_dir }}/update-center.json"
+
+- name: "deploy update site url"
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ cj_home }}/{{ item }}"
+  with_items:
+  - 'hudson.model.UpdateCenter.xml'
+
+- include: cj-restart-jenkins.yml

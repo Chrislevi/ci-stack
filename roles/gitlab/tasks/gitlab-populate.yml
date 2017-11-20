@@ -1,0 +1,96 @@
+---
+- name: "Install python-module"
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+  - python-docker
+  - python-pexpect
+  register: result
+  until: '"failed" not in result'
+  retries: 5
+  delay: 10
+
+- name: "Create temp module dir"
+  file:
+    path: "/tmp/{{ item }}"
+    state: directory
+  with_items:
+  - "{{ gitlab_cli_pkg }}"
+
+- name: "Unzip gitlab modules"
+  unarchive:
+    src: "{{ item }}.tar.gz"
+    dest: "/tmp/"
+  with_items:
+  - "{{ reqs_dir }}/{{ gitlab_cli_pkg }}"
+
+- name: "Install module"
+  shell: "/usr/bin/python setup.py {{ item }}"
+  args:
+    chdir: "/tmp/{{ gitlab_cli_pkg }}"
+  with_items:
+  - "build"
+  - "install"
+
+- name: "Deploy init-ptoken.py"
+  template:
+    src: "{{ item }}.j2"
+    dest: "/root/{{ item }}"
+    owner: "{{ gitlab_user.username }}"
+    group: "{{ gitlab_group }}"
+    mode: "u=rwx,g=rx,o=rx"
+  with_items:
+  - init-ptoken.py
+
+- name: "Initialize Private Token script"
+  shell: "python /root/init-ptoken.py"
+  register: ptoken
+
+- debug:
+    msg: "{{ ptoken.stdout_lines | join(' ')}}"
+
+- name: "Deploy Gitlab cfg"
+  template:
+    src: "{{ item }}.j2"
+    dest: "/etc/{{ item }}"
+  with_items:
+  - python-gitlab.cfg
+
+- name: "Deploy Jenkins-Gitlab API credentials"
+  template:
+    src: "{{ item }}.j2"
+    dest: "/tmp/{{ item }}"
+  with_items:
+  - gitlab-credential.xml
+  delegate_to: jenkins
+
+- name: "Set dynamic repo list"
+  find:
+    paths: "{{ gitlab_code_dir }}"
+    file_type: directory
+  register: gitlab_repo_dir
+
+- name: "Create projects"
+  shell: "gitlab -g gitlab project create --name {{ item.path | basename }}"
+  with_items:
+  - "{{ gitlab_repo_dir.files }}"
+
+- name: "Reconfigure origin ref"
+  shell: "git remote set-url origin ssh://git@{{ gitlab_hostname }}:{{ gitlab_ssh }}/root/{{ item.path | basename }}.git"
+  args:
+    chdir: "{{ item.path }}"
+  with_items:
+  - "{{ gitlab_repo_dir.files }}"
+
+- name: "Push code"
+  expect:
+    command: "git push origin --mirror"
+    chdir: "{{ item.path }}"
+    responses:
+      (?i)fingerprint: "yes"
+  with_items:
+  - "{{ gitlab_repo_dir.files }}"
+
+## To track all remote branch to local branch -> Do this after clone
+# for remote in `git branch -r | grep -v /HEAD`; do git checkout --track $remote ; done

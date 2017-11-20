@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<com.dabsquared.gitlabjenkins.connection.GitLabConnectionConfig plugin="gitlab-plugin@1.4.5">
+  <useAuthenticatedEndpoint>true</useAuthenticatedEndpoint>
+  <connections>
+    <com.dabsquared.gitlabjenkins.connection.GitLabConnection>
+      <name>Gitlab-Jenkins</name>
+      <url>http://{{ gitlab_hostname }}:{{ gitlab_default_port }}</url>
+      <apiTokenId>Gitlab-API</apiTokenId>
+      <ignoreCertificateErrors>true</ignoreCertificateErrors>
+      <connectionTimeout>10</connectionTimeout>
+      <readTimeout>10</readTimeout>
+    </com.dabsquared.gitlabjenkins.connection.GitLabConnection>
+  </connections>
+</com.dabsquared.gitlabjenkins.connection.GitLabConnectionConfig>

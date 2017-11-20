@@ -1,0 +1,13 @@
+# ------------------------------------------ JUSEPPE --------------------------------------------- #
+juseppe_container_name: juseppe
+juseppe_container_prefix: lanwen/juseppe
+juseppe_container_tag: 1.0.0
+juseppe_container_image: "{{ juseppe_container_prefix }}:{{ juseppe_container_tag }}"
+juseppe_container_port: 8080
+juseppe_host_port: 9090
+juseppe_docker_host_ip: "{{ cj_jenkins_hostname }}"
+juseppe_url: 'http://{{ juseppe_docker_host_ip }}:{{ juseppe_host_port }}'
+
+juseppe_cert_dir: /var/lib/juseppe
+juseppe_cert_file: uc.crt
+juseppe_plugin_cache_dir: "{{ reqs_dir }}/juseppe"

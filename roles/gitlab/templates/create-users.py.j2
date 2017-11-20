@@ -1,0 +1,13 @@
+import gitlab
+
+gl = gitlab.Gitlab('http://{{ gitlab_hostname }}:{{ gitlab_http }}', email='{{ gitlab_user.username }}', password='{{ gitlab_user.password }}')
+gl.auth()
+
+user = gl.users.create({'email': 'Jenkins@ci.com',
+                        'password': 'jenkins',
+                        'username': 'Jenkins',
+                        'name': 'Jenkins'})
+
+
+k = user.keys.create({'title': 'Jenkins',
+                        'key': open('/root/.ssh/id_rsa.pub').read()})

@@ -1,0 +1,50 @@
+---
+- name: "Check gitlab-credential.xml existance"
+  stat:
+    path="/tmp/gitlab-credential.xml"
+  register: credd
+
+- debug: var=credd
+
+- block:
+    - name: "Create Gitlab API Credential"
+      shell: >
+        cat /tmp/gitlab-credential.xml | \
+        java -jar {{ cj_cli_jar_location }} \
+        -s http://{{ cj_jenkins_hostname }}:{{ cj_http_port }}{{ cj_application_context | default('') }}/ \
+        -auth {{ jenkins_admin.username }}:{{ jenkins_admin.password }}
+        create-credentials-by-xml  "SystemCredentialsProvider::SystemContextResolver::jenkins" "(global)"
+      become: true
+      become_user: "{{ cj_runas_user }}"
+      ignore_errors: true
+
+    - name: "Deploy Gitlab connection config"
+      template:
+        src: "{{ item }}.j2"
+        dest: "{{ cj_home }}/com.dabsquared.gitlabjenkins.connection.GitLabConnectionConfig.xml"
+      with_items:
+      - "GitLabConnectionConfig.xml"
+
+    - name: "Extract Gitlab project ID"
+      local_action: shell
+        gitlab -g gitlab project search --query {{ ostack_repo.split('/')[1] }} | grep id | awk -F" " '{print $2}'
+      register: ostack_project_id
+
+    - debug: var=ostack_project_id
+
+    - name: "Configure Gitlab Webhook"
+      local_action: shell
+        gitlab -g gitlab project-hook create --project-id={{ ostack_project_id.stdout }} \
+        --url http://{{ cj_jenkins_hostname }}:{{ cj_http_port }}/project/{{ item }} \
+        --merge-requests-events true \
+        --enable-ssl-verification false \
+        --note-events true  \
+        --push-events false \
+        --token {{ gitlab_secret }}
+      with_items:
+      - "{{ seed_job_list }}"
+      when:
+      - ostack_project_id.rc == 0
+      - ostack_project_id.stdout != ""
+
+  when: credd.stat.exists | bool

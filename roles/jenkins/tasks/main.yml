@@ -1,0 +1,37 @@
+---
+- name: "Purge Jenkins"
+  include: "cj-cleanup.yml"
+  static: no
+  when: ((jenkins_purge is defined) and (jenkins_purge | bool))
+
+- name: "Install Jenkins"
+  include: "cj-install_jenkins.yml"
+
+- name: "Validate {{ cj_custom_user }} SSH keys"
+  include: "cj-ssh_key.yml"
+
+- name: "Install recommanded plugins"
+  include: "cj-plugins-install.yml" # Online & Offline are the same through Juseppe.
+
+- name: "Configure Jenkins Authentication & Authorization [known to do nothing on 1st run]"
+  include: "cj-init_config.yml"
+
+- name: "Add ssh public key of {{ cj_runas_user }} to {{ cj_local_admin_users[0].username }} properties in Jenkins"
+  include: "cj-add-public-key-to-admin-user.yml"
+
+- name: "Configure Gitlab API"
+  include: "cj-gitlab-config.yml"
+
+### configure look & feel
+- name: "Enable jenkins material theme"
+  include: "cj-theme.yml"
+  when: ((cj_theme is defined) and (cj_theme | bool))
+  static: no
+
+- name: "Deploy Pipelines"
+  include: "cj-seed.yml"
+  when: ((cj_deploy_pipe is defined) and (cj_deploy_pipe | bool))
+  tags:
+    - seed
+
+

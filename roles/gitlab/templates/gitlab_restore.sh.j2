@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Backups can be found at --> {{ gitlab_volume_data.split(':')[0] }}/backups <--
+set +x
+CON_NAME="{{ gitlab_container_name }}"
+RESTORE_POINT=$1 ### EXAMPLE: "1498469882_2017_06_26_9.3.0"
+
+# backup file should be placed in -> {{ gitlab_volume_data.split(':')[0] }}/backups
+
+docker exec -t ${CON_NAME} gitlab-ctl stop unicorn
+docker exec -t ${CON_NAME} gitlab-ctl stop sidekiq
+docker exec -t ${CON_NAME} gitlab-rake gitlab:backup:restore BACKUP=${RESTORE_POINT} force=yes
+docker exec -t ${CON_NAME} gitlab-ctl start
+docker exec -t ${CON_NAME} gitlab-ctl reconfigure
+docker exec -t ${CON_NAME} gitlab-rake gitlab:check SANITIZE=true

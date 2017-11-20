@@ -1,0 +1,33 @@
+---
+- name: "Merge lists to form juseppe_plugins"
+  include: "set-plugin-list.yml"
+
+- name: "Create cache dir"
+  file:
+    name: "{{ juseppe_plugin_cache_dir }}"
+    state: directory
+    owner: root
+    group: root
+
+- name: "Import local plugins"
+  synchronize:
+    src: "{{ juseppe_localdir_plugins }}/"
+    dest: "{{ juseppe_plugin_cache_dir }}"
+  when: juseppe_localdir_plugins is defined
+
+- block:
+  - set_fact:
+      plugin_url: "{{ nexus_url }}/{{ cj_nexus_mirror }}"
+    when: cj_nexus
+
+  - name: "Get plugin to local cache dir"
+    get_url:
+      url: "{{ plugin_url |d('https://updates.jenkins-ci.org') }}/download/plugins/{{ item.name }}/{{ item.version }}/{{ item.name }}.{{ item.extention | d('hpi') }}"
+      dest: "{{ juseppe_plugin_cache_dir }}"
+    with_items:
+      - "{{ juseppe_plugins }}"
+    register: res
+    until: '"OK" in res.msg'
+    retries: 5
+    delay: 5
+  when: juseppe_localdir_plugins is undefined

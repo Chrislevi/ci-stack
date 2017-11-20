@@ -1,0 +1,227 @@
+#!groovy
+import hudson.security.*
+import jenkins.model.*
+import com.cloudbees.plugins.credentials.CredentialsScope
+import com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl
+import com.cloudbees.jenkins.plugins.sshcredentials.impl.*
+import com.cloudbees.plugins.credentials.*
+import com.cloudbees.plugins.credentials.common.*
+import com.cloudbees.plugins.credentials.domains.*
+import com.cloudbees.plugins.credentials.impl.*
+import hudson.plugins.sshslaves.*
+import com.cloudbees.plugins.credentials.CredentialsScope
+import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredentials
+import java.lang.reflect.Field
+import org.jenkinsci.plugins.ghprb.*
+import hudson.model.*
+import hudson.slaves.*
+import hudson.plugins.sshslaves.*
+import java.util.ArrayList;
+import hudson.slaves.EnvironmentVariablesNodeProperty.Entry;
+
+
+def instance = Jenkins.getInstance()
+
+//-----------------  Create Jenkins Users -----------------------
+
+//println "Checking if security has already been set"
+//if (!instance.isUseSecurity()) {
+
+// disable signup
+def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+{% for account in cj_local_admin_users %}
+hudsonRealm.createAccount('{{ account.username }}', '{{ account.password }}')
+{% endfor %}
+{% for account in cj_local_regular_users %}
+hudsonRealm.createAccount('{{ account.username }}', '{{ account.password }}')
+{% endfor %}
+instance.setSecurityRealm(hudsonRealm)
+instance.save()
+
+def strategy = new hudson.security.ProjectMatrixAuthorizationStrategy()
+{% for account in cj_local_admin_users %}
+strategy.add(Jenkins.ADMINISTER, "{{ account.username }}")
+{% endfor %}
+{% for account in cj_local_regular_users %}
+//strategy.add(hudson.model.View.READ, "{{ account.username }}")
+//strategy.add(hudson.model.Item.READ, "{{ account.username }}")
+strategy.add(Jenkins.READ, "{{ account.username }}")
+{% endfor %}
+{% if cj_allow_anon_read is defined %}
+strategy.add(hudson.model.View.READ, 'anonymous')
+strategy.add(hudson.model.Item.READ, 'anonymous')
+strategy.add(Jenkins.READ, 'anonymous')
+{% endif %}
+
+instance.setAuthorizationStrategy(strategy)
+//}
+
+// --------------------------------   Create node credentials  -------------------------------------------------
+
+def addPassword = { username, new_password, new_id, description ->
+    def creds = com.cloudbees.plugins.credentials.CredentialsProvider.lookupCredentials(
+        com.cloudbees.plugins.credentials.common.StandardUsernameCredentials.class,
+        Jenkins.instance
+    )
+
+//    def c = creds.findResult { it.username == username ? it : null }
+      def c = creds.findResult { it.id == new_id ? it : null }
+
+
+        //println "found credential ${c.id} for username ${c.username}"
+
+        def credentials_store = Jenkins.instance.getExtensionList(
+            'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
+            )[0].getStore()
+
+        def scope = CredentialsScope.GLOBAL
+//          def scope = CredentialsScope.nodes
+
+        //def description = ""
+  def result
+  def new_c = new UsernamePasswordCredentialsImpl(scope, new_id, description, username, new_password)
+  if (c) {
+        result = credentials_store.updateCredentials(
+            com.cloudbees.plugins.credentials.domains.Domain.global(),
+            c,
+            new_c
+            )
+  } else {
+        result = credentials_store.addCredentials(
+            com.cloudbees.plugins.credentials.domains.Domain.global(),
+            new_c
+            )
+  }
+        if (result) {
+          if(c) {
+            println "credential updated for ${username}"
+          } else {
+            println "credential added for ${username}"
+          }
+          println "ID = ${new_c.id}"
+        } else {
+            println "failed to add credential for ${username}"
+        }
+
+}
+
+//CredentialsScope.each{println "<>: ${it}"}
+
+//addPassword('nodeuser', 'test1', '8bf43f0b-5cef-46b7-8d64-d1bd0a77e11a9', 'this is automatic generated credential')
+//  username, password, uuid, description
+
+{% for cred in cj_credentials %}
+addPassword('{{ cred.username }}', '{{ cred.password }}', '{{ cred.id }}', '{{ cred.name }}: {{ cred.description }}')
+{% endfor %}
+
+// ------------------------------------------------- create Node ssh key credentials -----------------------------------------------------------
+
+void create_or_update_credentials(String username, String password, String new_id, String description="", String private_key="") {
+    def global_domain = Domain.global()
+    def credentials_store =
+      Jenkins.instance.getExtensionList(
+        'com.cloudbees.plugins.credentials.SystemCredentialsProvider'
+      )[0].getStore()
+
+    def credentials
+    if (private_key == "" ) {
+      credentials = new UsernamePasswordCredentialsImpl(
+        CredentialsScope.GLOBAL,
+        new_id,
+        description,
+        username,
+        password
+      )
+    } else {
+      def key_source
+      if (private_key.startsWith('-----BEGIN')) {
+        key_source = new BasicSSHUserPrivateKey.DirectEntryPrivateKeySource(private_key)
+      } else {
+        key_source = new BasicSSHUserPrivateKey.FileOnMasterPrivateKeySource(private_key)
+      }
+      credentials = new BasicSSHUserPrivateKey(
+        CredentialsScope.GLOBAL,
+        new_id,
+        username,
+        key_source,
+        password,
+        description
+      )
+    }
+
+      credentials_store.addCredentials(global_domain, credentials)
+
+  }
+
+{% for cred in cj_sshkey_credentials %}
+create_or_update_credentials('{{ cred.username }}', '{{ cred.password }}', '{{ cred.id }}', '{{ cred.description }}', '{{ cred.private_key }}')
+{% endfor %}
+
+// -------------------------------------------------------- Configure Github ---------------------------------------------------------------------
+
+def descriptor = Jenkins.instance.getDescriptorByType(org.jenkinsci.plugins.ghprb.GhprbTrigger.DescriptorImpl.class)
+
+Field auth = descriptor.class.getDeclaredField("githubAuth")
+
+auth.setAccessible(true)
+
+githubAuth = new ArrayList<GhprbGitHubAuth>(1)
+// Github-api, credential-id, desc, Auth-id, secret
+githubAuth.add(new GhprbGitHubAuth("https://api.github.com", "", "{{ cj_credentials[0].id }}", "Github API Auth", "Github-Jenkins", null))
+auth.set(descriptor, githubAuth)
+
+descriptor.save()
+
+//------------------------------------------------------------- Create New nodes -------------------------------------------------------------------
+
+Jenkins jenkins = Jenkins.instance
+
+for (Node node in jenkins.nodes) {
+
+{% for new_node in cj_nodes %}
+      if ("$node.nodeName" == "{{ new_node.name }}") {
+          continue;
+      }
+{% endfor %}
+
+    println "Delete this old module - $node.nodeName was found!"
+    jenkins.removeNode(node)
+}
+jenkins.save()
+
+{% for new_node in cj_nodes %}
+
+{{ new_node.name }}: {
+    def need_update=0
+    for (Node node in jenkins.nodes) {
+      if ("$node.nodeName" == "{{ new_node.name }}") {
+         need_update=1
+         continue;
+      }
+    }
+    {% if new_node.launcher_type == 'ssh' %}
+    ComputerLauncher launcher = new SSHLauncher("{{ new_node.host }}", {{ new_node.ssh_port }} , "{{ new_node.credential_id }}", "","","","",  0,0,0)
+    {% else %}
+    ComputerLauncher launcher = new JNLPLauncher()
+    {% endif %}
+    Slave slave = new DumbSlave(
+                    "{{ new_node.name }}",
+                    "{{ new_node.description }}",
+                    "{{ new_node.home }}",
+                    "{{ new_node.executors }}",
+                    Node.Mode.NORMAL,
+                    "{{ new_node.labels }}",
+                    launcher,
+                    //new SSHLauncher("{{ new_node.host }}", {{ new_node.ssh_port }} , "{{ new_node.credential_id }}", "","","","",  0,0,0),
+                    //new JNLPLauncher(),
+                    new RetentionStrategy.Demand(0,120),
+                    new LinkedList())
+    if (need_update==1) {
+      jenkins.updateNode(slave)
+    } else {
+      jenkins.addNode(slave)
+    }
+}
+{% endfor %}
+
+jenkins.save()

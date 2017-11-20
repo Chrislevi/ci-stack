@@ -1,0 +1,9 @@
+---
+- name: "Install gitlab container"
+  include: gitlab-install.yml
+  when: "'gitlab-server' in group_names"
+
+- name: "Populate gitlab from {{ gitlab_code_dir }}"
+  include: gitlab-populate.yml
+  when: "'deploy-servers' in group_names and populate | bool"
+  tags: codepush

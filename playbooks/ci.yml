@@ -1,0 +1,44 @@
+---
+- hosts: ci-nodes:deploy-servers
+  tasks:
+    - name: "Network vars"
+      set_fact:
+        nexus_hostname: "{{ hostvars[groups['nexus-server'][0]]['ansible_host'] }}"     # Nexus IP
+        cj_jenkins_hostname: "{{ hostvars[groups['jenkins-server'][0]]['ansible_host'] }}" # Jenkins IP
+        gitlab_hostname: "{{ hostvars[groups['gitlab-server'][0]]['ansible_host'] }}"      # Gitlab IP
+
+    - name: "Print deploy setup"
+      debug:
+        var: "{{ item }}"
+      run_once: True
+      with_items:
+      - nexus_hostname
+      - cj_jenkins_hostname
+      - gitlab_hostname
+
+#- hosts: nexus-server
+#  roles:
+#  - java
+#  - nexus
+
+- hosts: deploy-servers:gitlab-server
+  serial: 1
+  vars:
+    populate: false
+  roles:
+  - java
+  - simple-docker-daemon # Install client and Archive container-docker.tar (deploy-servers)
+  - gitlab
+
+- hosts: deploy-servers
+  vars:
+    populate: true
+  roles:
+  - gitlab # Populate gitlab
+
+- hosts: jenkins-server
+  roles:
+  - java
+  - simple-docker-daemon # Install client and Run juseppe
+  - juseppe
+  - jenkins

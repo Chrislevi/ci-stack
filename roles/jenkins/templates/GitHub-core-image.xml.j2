@@ -1,0 +1,122 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@2.11">
+  <actions/>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>-1</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty/>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.27.0">
+      <projectUrl>https://github.com/{{ ostack_repo }}/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty plugin="gitlab-plugin@1.4.5">
+      <gitLabConnection>Gitlab-Jenkins</gitLabConnection>
+    </com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <org.jenkinsci.plugins.ghprb.GhprbTrigger plugin="ghprb@1.38.0">
+          <spec>* * * * *</spec>
+          <configVersion>3</configVersion>
+          <adminlist></adminlist>
+          <allowMembersOfWhitelistedOrgsAsAdmin>false</allowMembersOfWhitelistedOrgsAsAdmin>
+          <orgslist></orgslist>
+          <cron>* * * * *</cron>
+          <buildDescTemplate></buildDescTemplate>
+          <onlyTriggerPhrase>true</onlyTriggerPhrase>
+          <useGitHubHooks>false</useGitHubHooks>
+          <permitAll>true</permitAll>
+          <whitelist></whitelist>
+          <autoCloseFailedPullRequests>false</autoCloseFailedPullRequests>
+          <displayBuildErrorsOnDownstreamBuilds>true</displayBuildErrorsOnDownstreamBuilds>
+          <whiteListTargetBranches>
+            <org.jenkinsci.plugins.ghprb.GhprbBranch>
+              <branch></branch>
+            </org.jenkinsci.plugins.ghprb.GhprbBranch>
+          </whiteListTargetBranches>
+          <blackListTargetBranches>
+            <org.jenkinsci.plugins.ghprb.GhprbBranch>
+              <branch></branch>
+            </org.jenkinsci.plugins.ghprb.GhprbBranch>
+          </blackListTargetBranches>
+          <gitHubAuthId>Github-Jenkins</gitHubAuthId>
+          <triggerPhrase>Raus! image</triggerPhrase>
+          <skipBuildPhrase>.*\[skip\W+ci\].*</skipBuildPhrase>
+          <blackListCommitAuthor></blackListCommitAuthor>
+          <blackListLabels></blackListLabels>
+          <whiteListLabels></whiteListLabels>
+          <includedRegions></includedRegions>
+          <excludedRegions></excludedRegions>
+          <extensions>
+            <org.jenkinsci.plugins.ghprb.extensions.status.GhprbSimpleStatus>
+              <commitStatusContext></commitStatusContext>
+              <triggeredStatus></triggeredStatus>
+              <startedStatus></startedStatus>
+              <statusUrl></statusUrl>
+              <addTestResults>false</addTestResults>
+              <completedStatus>
+                <org.jenkinsci.plugins.ghprb.extensions.comments.GhprbBuildResultMessage>
+                  <message>SUCCESS</message>
+                  <result>SUCCESS</result>
+                </org.jenkinsci.plugins.ghprb.extensions.comments.GhprbBuildResultMessage>
+                <org.jenkinsci.plugins.ghprb.extensions.comments.GhprbBuildResultMessage>
+                  <message>FAILED</message>
+                  <result>FAILURE</result>
+                </org.jenkinsci.plugins.ghprb.extensions.comments.GhprbBuildResultMessage>
+                <org.jenkinsci.plugins.ghprb.extensions.comments.GhprbBuildResultMessage>
+                  <message>ERROR</message>
+                  <result>ERROR</result>
+                </org.jenkinsci.plugins.ghprb.extensions.comments.GhprbBuildResultMessage>
+              </completedStatus>
+            </org.jenkinsci.plugins.ghprb.extensions.status.GhprbSimpleStatus>
+          </extensions>
+        </org.jenkinsci.plugins.ghprb.GhprbTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty/>
+    <com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty plugin="gitlab-plugin@1.4.5">
+      <gitLabConnection>Gitlab-Jenkins</gitLabConnection>
+    </com.dabsquared.gitlabjenkins.connection.GitLabConnectionProperty>
+    <jenkins.model.BuildDiscarderProperty>
+      <strategy class="hudson.tasks.LogRotator">
+        <daysToKeep>-1</daysToKeep>
+        <numToKeep>5</numToKeep>
+        <artifactDaysToKeep>-1</artifactDaysToKeep>
+        <artifactNumToKeep>-1</artifactNumToKeep>
+      </strategy>
+    </jenkins.model.BuildDiscarderProperty>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty reference="../com.coravy.hudson.plugins.github.GithubProjectProperty"/>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition" plugin="workflow-cps@2.34">
+    <scm class="hudson.plugins.git.GitSCM" plugin="git@3.3.0">
+      <configVersion>2</configVersion>
+      <userRemoteConfigs>
+        <hudson.plugins.git.UserRemoteConfig>
+          <name>origin</name>
+          <refspec>+refs/pull/${ghprbPullId}/*:refs/remotes/origin/pr/${ghprbPullId}/*</refspec>
+          <url>https://github.com/{{ ostack_repo }}.git</url>
+          <credentialsId>Github-user</credentialsId>
+        </hudson.plugins.git.UserRemoteConfig>
+      </userRemoteConfigs>
+      <branches>
+        <hudson.plugins.git.BranchSpec>
+          <name>${sha1}</name>
+        </hudson.plugins.git.BranchSpec>
+      </branches>
+      <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
+      <submoduleCfg class="list"/>
+      <extensions/>
+    </scm>
+      <scriptPath>Jenkinsfiles/Jenkinsfile-buildimage</scriptPath>
+    <lightweight>false</lightweight>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>

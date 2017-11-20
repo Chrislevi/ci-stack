@@ -1,0 +1,193 @@
+---
+- name: "Ensure Nexus o/s group exists"
+  group:
+    name: "{{ nexus_os_group }}"
+    state: present
+
+- name: "Ensure Nexus o/s user exists"
+  user:
+    name: "{{ nexus_os_user }}"
+    group: "{{ nexus_os_group }}"
+    shell: "/bin/bash"
+    state: present
+
+- name: "Unpack Nexus download"
+  unarchive:
+    src: "{{ item }}"
+    dest: "{{ nexus_installation_dir }}"
+    creates: "{{ nexus_installation_dir }}/nexus-{{ nexus_version }}"
+    force: no
+    copy: yes
+  with_items:
+  - "{{ reqs_dir }}/{{ nexus_package }}"
+
+- name: "Check if SystemD service is installed"
+  stat:
+    path: /etc/systemd/system/nexus.service
+  register: nexus_systemd_service_file
+
+- name: "Stop systemd service"
+  shell: 'systemctl stop nexus.service'
+  when: nexus_systemd_service_file.stat.exists
+
+- name: "Update symlink nexus-latest"
+  file:
+    path: "{{ nexus_installation_dir }}/nexus-latest"
+    src: "{{ nexus_installation_dir }}/nexus-{{ nexus_version }}"
+    owner: "{{ nexus_os_user }}"
+    group: "{{ nexus_os_group }}"
+    state: link
+  register: nexus_latest_version
+
+- name: "Delete unpacked data directory"
+  file:
+    path: "{{ nexus_installation_dir }}/nexus-latest/data"
+    state: absent
+
+- name: "Set path to default settings"
+  set_fact:
+    nexus_default_settings_file: "{{ nexus_installation_dir }}/nexus-latest/etc/nexus-default.properties"
+    nexus_app_dir_settings_dirs:
+      - "{{ nexus_installation_dir }}/nexus-latest/etc"
+      - "{{ nexus_installation_dir }}/nexus-latest/etc/karaf"
+      - "{{ nexus_installation_dir }}/nexus-latest/etc/jetty"
+      - "{{ nexus_installation_dir }}/nexus-latest/etc/fabric"
+      - "{{ nexus_installation_dir }}/nexus-latest/etc/logback"
+      - "{{ nexus_installation_dir }}/nexus-latest/etc/scripts"
+
+- name: "Set dir perms"
+  file:
+    path: "{{ item }}"
+    state: "directory"
+    owner: "{{ nexus_os_user }}"
+    group: "{{ nexus_os_group }}"
+    mode: "u=rwx,g=rx,o=rx"
+    recurse: false
+  with_items:
+  - "{{ nexus_app_dir_settings_dirs }}"
+  - "{{ nexus_tmp_dir }}"
+  - "{{ nexus_backup_dir }}"
+
+- name: "Create Nexus data directory"
+  file:
+    path: "{{ nexus_data_dir }}"
+    state: "directory"
+    owner: "{{ nexus_os_user }}"
+    group: "{{ nexus_os_group }}"
+
+- name: "Deploy nexus config files"
+  template:
+    src: "{{ item | basename }}.j2"
+    dest: "{{ item }}"
+    mode: "u=rwx,g=rx,o=rx"
+  with_items:
+  - "{{ nexus_installation_dir }}/nexus-latest/bin/nexus.vmoptions"
+  - "{{ nexus_installation_dir }}/nexus-latest/bin/nexus.rc"
+  - "{{ nexus_installation_dir }}/nexus-latest/etc/nexus-default.properties"
+  - "{{ nexus_script_dir }}/nexus-blob-backup.sh"
+  - "{{ nexus_script_dir }}/nexus-blob-restore.sh"
+  - "/home/{{ nexus_os_user }}/.bashrc"
+  - "/etc/systemd/system/nexus.service"
+
+- name: "Symlink scripts to /sbin"
+  file:
+    src: "{{ item }}"
+    dest: "/sbin/{{ item | basename }}"
+    state: link
+  with_fileglob:
+    - "{{ nexus_script_dir }}/*.sh"
+
+- name: 'Check if data directory is empty (first-time install)'
+  command: "ls {{ nexus_data_dir }}"
+  register: nexus_data_dir_contents
+
+- name: "Clean cache for upgrade process"
+  file:
+    path: "{{ nexus_data_dir }}/clean_cache"
+    state: touch
+  when: nexus_latest_version.changed and nexus_data_dir_contents.stdout != ""
+
+- name: "Restart nexus service"
+  service:
+    name: nexus
+    state: restarted
+    enabled: yes
+
+- name: "Waiting for Nexus service to be ready..."
+  wait_for:
+    path: "{{ nexus_data_dir }}/log/nexus.log"
+    search_regex: "Started Sonatype Nexus OSS .*"
+    timeout: 1800
+
+- name: "Waiting for nexus to be ready..."
+  wait_for:
+    port: "{{ nexus_default_port }}"
+    delay: 5
+
+- name: "Set application dirs to root"
+  file:
+    path: "{{ item }}"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "u=rwx,g=rx,o=rx"
+    recurse: false
+  with_items:
+  - "{{ nexus_app_dir_settings_dirs }}"
+  - "{{ nexus_installation_dir }}/nexus-latest/etc"
+
+- name: "First-time install admin password"
+  set_fact:
+    current_nexus_admin_password: 'admin123'
+  when: nexus_data_dir_contents.stdout == ""
+
+- name: "Subsequent re-provision admin password"
+  set_fact:
+    current_nexus_admin_password: "{{ nexus_admin_password }}"
+  when: nexus_data_dir_contents.stdout != ""
+  no_log: true
+
+- include: declare_script_each.yml
+  with_items:
+    - update_admin_password
+    - setup_ldap
+    - setup_anonymous_access
+    - setup_base_url
+    - setup_capability
+    - setup_role
+    - setup_privilege
+    - setup_user
+    - delete_repo
+    - delete_blobstore
+    - create_blobstore
+    - create_repo_maven_proxy
+    - create_repo_maven_group
+    - create_repo_maven_hosted
+    - create_repo_docker_hosted
+    - create_repo_docker_proxy
+    - create_repo_docker_group
+    - create_repo_pypi_hosted
+    - create_repo_pypi_proxy
+    - create_repo_pypi_group
+    - create_repo_raw_proxy
+    - create_repo_raw_hosted
+    - create_repo_raw_group
+    - create_repo_rubygems_hosted
+    - create_repo_rubygems_proxy
+    - create_repo_rubygems_group
+    - create_repo_bower_hosted
+    - create_repo_bower_proxy
+    - create_repo_bower_group
+    - create_repo_npm_hosted
+    - create_repo_npm_proxy
+    - create_repo_npm_group
+    - create_task
+
+- name: "Config nexus-backup shell cron"
+  cron:
+    name: "Backup nexus Blobstore"
+    minute: "1"
+    hour: "21"
+    job: "/sbin/nexus-blob-backup.sh 2>&1 | tee -a {{ nexus_backup_log }}"
+    state: present
+    user: "root"

@@ -1,0 +1,10 @@
+---
+#- name: "Get all plugins from internet to cache directory"
+#  include: "get-plugins.yml"
+
+- name: "Generate juseppe certificate"
+  include: "gen-cert.yml"
+
+- name: "Run juseppe container"
+  include: "run-container.yml"
+

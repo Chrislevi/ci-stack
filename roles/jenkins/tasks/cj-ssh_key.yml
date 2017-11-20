@@ -1,0 +1,28 @@
+---
+- set_fact:
+    ssh_key_dir: "{{ cj_home }}/.ssh"
+    priv_key_path: "{{ cj_home }}/.ssh/id_rsa"
+    pub_key_path: "{{ cj_home }}/.ssh/id_rsa.pub"
+  when: not cj_runas
+
+- name: "Create {{ ssh_key_dir }}"
+  file:
+    path: "{{ ssh_key_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ cj_runas_user }}"
+    group: "{{ cj_runas_group }}"
+
+- name: "Add root ssh-key to Jenkins" # TODO Add same flow to cj_runas=true
+  copy:
+    src: "/root/.ssh/{{ item }}"
+    dest: "{{ cj_home }}/.ssh/{{ item }}"
+    force: true
+    owner: "{{ cj_runas_user }}"
+    group: "{{ cj_runas_group }}"
+    mode: 0644
+  with_items:
+  - "id_rsa"
+  - "id_rsa.pub"
+  when: not cj_runas
+

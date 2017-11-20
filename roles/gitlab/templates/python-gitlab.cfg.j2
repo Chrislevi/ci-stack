@@ -1,0 +1,8 @@
+[global]
+default = gitlab
+ssl_verify = false
+timeout = 10
+
+[gitlab]
+url = http://{{ gitlab_hostname }}:{{ gitlab_http }}
+private_token = {{ ptoken.stdout_lines | join(' ')}}

@@ -1,0 +1,46 @@
+#! /bin/bash
+
+set +x
+for envvar in $(env | grep OS_ | awk -F "=" '{print $1}'); do unset $envvar; done;
+for envvar in $(env | grep ST_ | awk -F "=" '{print $1}'); do unset $envvar; done;
+
+# NOTE:
+# Auth version 1.0 requires ST_AUTH, ST_USER, and ST_KEY environment viarables
+# to be set or overridden with -A, -U, or -K.
+
+# Auth version 2.0 requires OS_AUTH_URL, OS_USERNAME, OS_PASSWORD, and
+# OS_TENANT_NAME OS_TENANT_ID to be set or overridden with --os-auth-url,
+# --os-username, --os-password, --os-tenant-name os os-tenant-id Note:
+# adding "-V 2" is necessary for this
+
+export ST_AUTH="http://{{ consul_svc.swift_proxy.hostname }}:{{ consul_svc.swift_proxy.port }}/auth/v2.0"
+export ST_USER="{{ swift_glance_tenant }}:{{ swift_glance_subuser }}"
+export ST_KEY="{{ swift_v1_key }}"
+export TIMESTAMP=$(date "+%Y_%m_%d")
+export BUCKET_NAME=${BUCKET_NAME:-"gitlab_backup"}
+export BACKUP_DIR=${BACKUP_DIR:-"{{ gitlab_volume_data.split(':')[0] }}/backups"}
+export GITLAB_NAME=${GITLAB_NAME:-"{{ gitlab_container_name }}"}
+
+# Create backup
+docker exec -t ${GITLAB_NAME} gitlab-rake gitlab:backup:create # Backup DATA
+docker exec -t gitlab /bin/sh -c  'umask 0077; tar cfz /var/opt/gitlab/backups/$(date "+gitlab-etc-%Y-%m-%d.tgz") -C / etc/gitlab'
+
+cd ${BACKUP_DIR}
+# Push to ceph
+for bak in $(cd ${BACKUP_DIR}; ls | grep ${TIMESTAMP}); do
+  swift upload ${BUCKET_NAME} ${bak}
+  EXIT_CODE=$?
+  if [ ${EXIT_CODE} -gt 0 ]; then
+    echo "There has been an error uploading ${BACKUP} EXIT CODE - ${EXIT_CODE}"
+    exit 1
+  else
+    echo "Daily upload successful - ${TIMESTAMP}"
+  fi
+done
+
+echo "---------------------------------- Bucket content --------------------------------------"
+swift list ${BUCKET_NAME} | tail -10
+
+for envvar in $(env | grep ST_ | awk -F "=" '{print $1}'); do unset $envvar; done;
+for envvar in $(env | grep OS_ | awk -F "=" '{print $1}'); do unset $envvar; done;
+exit 0

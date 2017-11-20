@@ -1,0 +1,14 @@
+import gitlab
+
+gl = gitlab.Gitlab('http://{{ gitlab_hostname }}:{{ gitlab_http }}', email='{{ gitlab_user.username }}', password='{{ gitlab_user.password }}')
+gl.auth()
+pt = gl.user.private_token
+
+# Inject root ssh pub key into Gitlab
+try:
+    k = gl.user.keys.create({'title': 'my_key', 'key': open('/root/.ssh/id_rsa.pub').read()})
+except Exception:
+    pass
+
+# Write private token into secret
+print "%s" % pt

@@ -1,0 +1,73 @@
+# Purge flow
+- name: "Remove previous git projects"
+  shell: rm -rf /srv/gitlab/data/git-data/repositories/root #; docker kill gitlab # Purge flow
+  ignore_errors: true
+
+- name: "Remove previous container"
+  shell: docker rm gitlab -f
+  ignore_errors: true
+
+- set_fact:
+    gitlab_container_image: "{{ gitlab_container_prefix }}"
+
+#- name: "Login to nexus" ## TODO XXX Closed Network
+#  docker_login:
+#    registry: "{{ nexus_docker_url }}"
+#    username: "admin"
+#    password: "{{ nexus_admin_password }}"
+
+- docker_container:
+    name: "{{ gitlab_container_name }}"
+    hostname: "{{ gitlab_container_name }}"
+    image: "{{ gitlab_container_image }}:{{ gitlab_container_tag }}"
+    state: started
+    restart_policy: always
+    restart: yes
+    published_ports:
+    - "{{ gitlab_http_port }}"
+    - "{{ gitlab_https_port }}"
+    - "{{ gitlab_ssh_port }}"
+    volumes:
+    - "{{ gitlab_volume_config }}"
+    - "{{ gitlab_volume_log }}"
+    - "{{ gitlab_volume_data }}"
+
+- name: "Wait for gitlab http port - takes time.."
+  uri:
+    url: "http://{{ gitlab_hostname }}:{{ gitlab_default_port }}"
+    status_code: 200
+  register: gitlab_page
+  until: gitlab_page.status == 200
+  retries: 30
+  delay: 15
+
+- name: "Chmod gitlab logs"
+  shell: "docker exec -u root {{ gitlab_container_name }} chmod 0664 /opt/gitlab/embedded/service/gitlab-rails/log/production.log"
+  register: success
+  until: success.rc == 0
+  retries: 10
+  delay: 2
+
+- name: "Initialize Gitlab DB"
+  shell: "docker exec -i -u git {{ gitlab_container_name }} gitlab-rake gitlab:setup RAILS_ENV=production GITLAB_ROOT_PASSWORD={{ gitlab_user.password }} GITLAB_ROOT_EMAIL=admin@example.com force=yes"
+  ignore_errors: true
+
+
+# FIXME XXX ceph swift variables are missing
+#- name: "Deploy Backup/Restore scripts"
+#  template:
+#    src: "{{ item }}.j2"
+#    dest: "/root/{{ item }}"
+#    mode: "u=rwx,g=rwx,o=rx"
+#  with_items:
+#  - "gitlab_backup.sh"
+#  - "gitlab_restore.sh"
+
+#- name: "Config gitlab-backup shell cron"
+#  cron:
+#    name: "Backup Gitlab Data/Conf"
+#    special_time: daily
+#    job: "/root/gitlab_backup.sh 2>&1 | tee -a {{ gitlab_backup_log }}"
+#    state: present
+#  tags:
+#    - cronn

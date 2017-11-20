@@ -1,0 +1,23 @@
+---
+gitlab_default_port: '7080'
+gitlab_container_name: gitlab
+gitlab_backup_log: '/var/log/gitlab-backup.log'
+gitlab_cli_pkg: 'python-gitlab-0.20'
+
+# Docker systemd service params
+gitlab_description: "GitLab community edition"
+gitlab_container_prefix: gitlab/gitlab-ce
+gitlab_container_tag: latest
+gitlab_container_image: "{{ gitlab_container_prefix }}"
+gitlab_http_port: "{{ gitlab_default_port }}:80"
+gitlab_https_port: "8443:443"
+gitlab_ssh_port: "8822:22"
+gitlab_volume_config: "/srv/gitlab/config:/etc/gitlab"
+gitlab_volume_log: "/srv/gitlab/logs:/var/log/gitlab"
+gitlab_volume_data: "/srv/gitlab/data:/var/opt/gitlab"
+
+#Gitlab Code injection vars
+gitlab_group: "root"
+gitlab_code_dir: "/opt/git"
+gitlab_ssh: "{{ gitlab_ssh_port.split(':')[0] }}"
+gitlab_http: "{{ gitlab_default_port }}"

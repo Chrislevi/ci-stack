@@ -1,0 +1,38 @@
+
+
+*.zip
+*.gz
+*.tar
+*.tgz
+*.iso
+*.img
+*.retry
+
+reqs/*
+logs/*
+docs/FAQ
+
+roles/nexus/files/*tar.gz
+roles/gitlab/files/*tar.gz
+
+tmp
+tmp/*
+
+playbooks/*.retry
+playbooks/test.yml
+
+# PyCharm
+.idea/
+
+# Mac stuff
+.DS_Store
+
+# Files
+**/*.deb
+**/*.gem
+**/*.tar.gz
+**/*.tar
+**/*.zip
+**/*.retry
+
+

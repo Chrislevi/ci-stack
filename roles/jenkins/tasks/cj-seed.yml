@@ -1,0 +1,32 @@
+---
+- name: "Cli Login"
+  include: "cj-cli-login.yml"
+
+- name: "Delete seed job(s)"
+  jenkins_job:
+    url: "http://{{ cj_jenkins_hostname }}:{{ cj_http_port }}"
+    name: "{{ item }}"
+    user: "{{ cj_local_admin_users[0].username }}"
+    password: "{{ cj_local_admin_users[0].password }}"
+    state: absent
+  with_items: "{{ seed_job_list }}"
+
+- name: "Create seed job(s)"
+  jenkins_job:
+    url: "http://{{ cj_jenkins_hostname }}:{{ cj_http_port }}"
+    config: "{{ lookup('template', 'templates/{{ item }}.xml.j2') }}"
+    name: "{{ item }}"
+    user: "{{ cj_local_admin_users[0].username }}"
+    password: "{{ cj_local_admin_users[0].password }}"
+  with_items: "{{ seed_job_list }}"
+
+- include: cj-restart-jenkins.yml
+
+# Trigger after deploy
+#- name: "Trigger seed job"
+#  shell: >
+#    java -jar {{ cj_cli_jar_location }} \
+#    -s http://{{ cj_jenkins_hostname }}:{{ cj_http_port }}{{ cj_application_context | default('') }}/ \
+#    build -s {{ item }}
+#  with_items: "{{ seed_job_list }}"
+

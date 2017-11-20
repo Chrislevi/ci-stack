@@ -1,0 +1,19 @@
+[deploy-servers]
+infra ansible_host=localhost ansible_connection=local
+
+# Fill out default server IPs -> ansible_host
+
+# group sections
+[nexus-server]
+nexus ansible_host=''
+
+[jenkins-server]
+jenkins ansible_host=''
+
+[gitlab-server]
+gitlab ansible_host=''
+
+[ci-nodes:children]
+gitlab-server
+nexus-server
+jenkins-server

@@ -1,0 +1,4 @@
+---
+- hosts: deploy-servers
+  roles:
+  - reqs
